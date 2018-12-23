@@ -17,7 +17,28 @@ func NewHandler() http.Handler{
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upload", UploadHandler)
 	mux.HandleFunc("/download/", DownloadHandler)
+	mux.HandleFunc("/delete/", DeleteHandler)
 	return mux
+}
+
+// DeleteHandler provies an ability to delete a file from server
+// Simply delete the file from local storage and if the file was successfully deleted
+// send the deleted filename in the response
+func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
+	filename := path.Base(request.URL.Path)
+
+	if _, err := os.Stat(downloadFolder + filename); os.IsNotExist(err) {
+		writer.WriteHeader(404)
+		return
+	}
+	err := os.Remove(downloadFolder + filename)
+	if err != nil{
+		log.Fatal(err)
+	}
+
+	if _, err := os.Stat(downloadFolder + filename); os.IsNotExist(err) {
+		_, err = writer.Write([]byte("File Deleted: " + filename))
+	}
 }
 
 // DownloadHandler provides an ability to download the file from server using browser
