@@ -3,6 +3,7 @@ package handler
 
 import (
 	"GoExcercise/namegen"
+	"github.com/gorilla/mux"
 	"io"
 	"log"
 	"net/http"
@@ -10,33 +11,66 @@ import (
 	"path"
 )
 
-const downloadFolder = "./downloads/"
+const DownloadFolder = "/tmp/downloads/"
 
-// NewHandler creates a new ServeMux and provides pattern-handler mapping
-func NewHandler() http.Handler{
-	mux := http.NewServeMux()
-	mux.HandleFunc("/upload", UploadHandler)
-	mux.HandleFunc("/download/", DownloadHandler)
-	mux.HandleFunc("/delete/", DeleteHandler)
-	return mux
+func init(){
+	err := os.MkdirAll(DownloadFolder, os.ModePerm)
+	if err != nil{
+		log.Fatal(err)
+	}
 }
 
-// DeleteHandler provies an ability to delete a file from server
-// Simply delete the file from local storage and if the file was successfully deleted
+// NewHandler creates a new gorilla mux router and provides pattern-handler mapping
+func NewHandler() http.Handler{
+	router := mux.NewRouter()
+	router.HandleFunc("/upload", UploadHandler)
+	router.HandleFunc("/download/", DownloadHandler)
+	router.HandleFunc("/delete/", DeleteHandler)
+	router.HandleFunc("/rename/{oldName}/new/{newName}", RenameHandler)
+	return router
+}
+
+func RenameHandler(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	oldName := vars["oldName"]
+	newName := vars["newName"]
+	if _, err := os.Stat(DownloadFolder + oldName); os.IsNotExist(err) {
+		writer.WriteHeader(404)
+		return
+	} else if err != nil{
+		writer.WriteHeader(500)
+		return
+	}
+	if _, err := os.Stat(DownloadFolder + newName); !os.IsNotExist(err) {
+		writer.WriteHeader(409)
+		return
+	}
+	err := os.Rename(DownloadFolder + oldName, DownloadFolder + newName)
+	if err != nil{
+		log.Fatal(err)
+		return
+	}
+	_, err = writer.Write([]byte(newName))
+}
+
+// DeleteHandler provides an ability to delete a file from server
+//
+// Simply delete the file from the local storage and if the file was successfully deleted
 // send the deleted filename in the response
 func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
 	filename := path.Base(request.URL.Path)
 
-	if _, err := os.Stat(downloadFolder + filename); os.IsNotExist(err) {
+	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
 		writer.WriteHeader(404)
 		return
 	}
-	err := os.Remove(downloadFolder + filename)
+
+	err := os.Remove(DownloadFolder + filename)
 	if err != nil{
 		log.Fatal(err)
 	}
 
-	if _, err := os.Stat(downloadFolder + filename); os.IsNotExist(err) {
+	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
 		_, err = writer.Write([]byte("File Deleted: " + filename))
 	}
 }
@@ -46,11 +80,11 @@ func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
 func DownloadHandler(writer http.ResponseWriter, request *http.Request) {
 	filename := path.Base(request.URL.Path)
 
-	if _, err := os.Stat(downloadFolder + filename); os.IsNotExist(err) {
+	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
 		writer.WriteHeader(404)
 		return
 	}
-	file, err := os.Open(downloadFolder + filename)
+	file, err := os.Open(DownloadFolder + filename)
 	if err != nil{
 		log.Fatal(err)
 	}
@@ -71,7 +105,7 @@ func UploadHandler(writer http.ResponseWriter, request *http.Request) {
 
 	uri := request.FormValue("uri")
 	fileName := namegen.GenerateFileName(10)
-	err := UploadFile(path.Join(downloadFolder, fileName), uri)
+	err := UploadFile(path.Join(DownloadFolder, fileName), uri)
 	if err != nil {
 		_, _ = io.WriteString(writer, err.Error())
 	}
