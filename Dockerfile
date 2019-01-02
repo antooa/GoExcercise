@@ -6,8 +6,6 @@ ENV GOPATH /go
 
 RUN apk add make
 
-RUN apk add openssl ca-certificates
-
 WORKDIR /go/src/GoExcercise
 
 ADD . .
