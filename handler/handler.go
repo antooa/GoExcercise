@@ -25,7 +25,7 @@ func NewHandler() http.Handler{
 	router := mux.NewRouter()
 	router.HandleFunc("/upload", UploadHandler)
 	router.HandleFunc("/download/", DownloadHandler)
-	router.HandleFunc("/delete/", DeleteHandler)
+	router.HandleFunc("/delete/{filename}", DeleteHandler)
 	router.HandleFunc("/rename/{oldName}/new/{newName}", RenameHandler)
 	return router
 }
@@ -58,7 +58,8 @@ func RenameHandler(writer http.ResponseWriter, request *http.Request) {
 // Simply delete the file from the local storage and if the file was successfully deleted
 // send the deleted filename in the response
 func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
-	filename := path.Base(request.URL.Path)
+	vars := mux.Vars(request)
+	filename := vars["filename"]
 
 	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
 		writer.WriteHeader(404)
@@ -107,10 +108,18 @@ func UploadHandler(writer http.ResponseWriter, request *http.Request) {
 	fileName := namegen.GenerateFileName(10)
 	err := UploadFile(path.Join(DownloadFolder, fileName), uri)
 	if err != nil {
-		_, _ = io.WriteString(writer, err.Error())
+		_, err = writer.Write([]byte(err.Error()))
+		if err != nil{
+			log.Fatal(err)
+		}
+		//writer.WriteHeader(500)
+		return
 	}
 
 	_, err = writer.Write([]byte(fileName))
+	if err != nil{
+		log.Fatal(err)
+	}
 }
 
 // UploadFile copies the body of the response into the new file on the server

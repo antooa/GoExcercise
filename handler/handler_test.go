@@ -11,6 +11,60 @@ import (
 
 var SampleUrl = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_120x44dp.png"
 
+func TestDeleteHandler(t *testing.T) {
+	const filename = "old"
+
+	err := handler.UploadFile(handler.DownloadFolder+filename, SampleUrl)
+	if err != nil {
+		t.Fatal("Error while uploading file: ", err.Error())
+	}
+
+	req, err := http.NewRequest("DELETE", "/delete/"+filename, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	handler.NewHandler().ServeHTTP(recorder, req)
+
+	if status := recorder.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: %v want %v", status, http.StatusOK)
+	}
+
+	if _, err := os.Stat(handler.DownloadFolder + filename); err == nil {
+		t.Fatal("File has not been deleted")
+	}
+
+}
+
+func TestUploadHandler(t *testing.T) {
+
+	req, err := http.NewRequest("POST", "/upload?uri="+SampleUrl, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	recorder := httptest.NewRecorder()
+
+	handler.NewHandler().ServeHTTP(recorder, req)
+	filename := recorder.Body.String()
+
+	if status := recorder.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: %v want %v", status, http.StatusOK)
+	}
+
+	if _, err := os.Stat(handler.DownloadFolder + filename); os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+
+	err = os.Remove(handler.DownloadFolder + filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
+
 func TestRenameHandler(t *testing.T) {
 	const oldName = "old"
 	const newName = "new"
@@ -46,23 +100,23 @@ func TestRenameHandler(t *testing.T) {
 
 func TestUploadFile(t *testing.T) {
 
-	err := handler.UploadFile("testfile1", "")
+	err := handler.UploadFile( handler.DownloadFolder+"testfile1", "")
 	expected := `Get : unsupported protocol scheme ""`
 	if err.Error() != expected {
 		t.Error("For", `""`, "expected", expected, "got", err.Error())
 	}
 
-	err = handler.UploadFile("testfile2", SampleUrl)
+	err = handler.UploadFile(handler.DownloadFolder+"testfile2", SampleUrl)
 	expected = string("<nil>")
 	if err != nil {
 		t.Error("For", `google pic`, "expected", expected, "got", err.Error())
 	}
-	err = os.Remove("testfile1")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = os.Remove("testfile2")
-	if err != nil {
-		log.Fatal(err)
-	}
+	//err = os.Remove("testfile1")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//err = os.Remove("testfile2")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 }
