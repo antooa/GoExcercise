@@ -1,7 +1,5 @@
 FROM golang:1.11.4-alpine3.8 as builder
 
-EXPOSE 8080
-
 ENV GOPATH /go
 
 RUN apk add make
@@ -13,6 +11,8 @@ ADD . .
 RUN make build-server
 
 FROM alpine:3.8
+
+EXPOSE 8080
 
 RUN apk add openssl ca-certificates
 

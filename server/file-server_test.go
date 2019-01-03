@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-func TestUploadDelete(t *testing.T) {
+// TestServer is a test for all the functions (except download), provided by server
+func TestServer(t *testing.T) {
 	u := url.URL{
 		Scheme:   "http",
 		Host:     "localhost:8080",
@@ -16,17 +17,17 @@ func TestUploadDelete(t *testing.T) {
 	}
 	resp, err := http.Get(u.String())
 	if err != nil {
-		t.Errorf("Couldn't GET : %v; Got %v", u.String(), err)
+		t.Fatalf("Couldn't GET : %v; Got %v", u.String(), err)
 	}
 	defer resp.Body.Close()
 
 	if status := resp.StatusCode; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: %v want %v", status, http.StatusOK)
+		t.Fatalf("handler returned wrong status code: %v want %v", status, http.StatusOK)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil{
-		t.Errorf("Unable to read body")
+		t.Fatalf("Unable to read body")
 	}
 	filename := string(bodyBytes)
 
@@ -39,11 +40,12 @@ func TestUploadDelete(t *testing.T) {
 	}
 	renResp, err := http.Get(renUrl.String())
 	if err != nil {
-		t.Errorf("Couldn't GET : %v", renUrl.String())
+		t.Fatalf("Couldn't GET : %v", renUrl.String())
 	}
+	defer renResp.Body.Close()
 
 	if status := renResp.StatusCode; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: %v want %v", status, http.StatusOK)
+		t.Fatalf("handler returned wrong status code: %v want %v", status, http.StatusOK)
 	}
 
 	t.Log(filename)
@@ -55,11 +57,12 @@ func TestUploadDelete(t *testing.T) {
 
 	deleteResp, err := http.Get(delUrl.String())
 	if err != nil {
-		t.Errorf("Couldn't GET : %v", delUrl.String())
+		t.Fatalf("Couldn't GET : %v", delUrl.String())
 	}
+	defer deleteResp.Body.Close()
 
 	if status := deleteResp.StatusCode; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: %v want %v", status, http.StatusOK)
+		t.Fatalf("handler returned wrong status code: %v want %v", status, http.StatusOK)
 	}
 }
 
