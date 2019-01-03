@@ -9,6 +9,6 @@ import (
 
 func main() {
 	server := srv.NewFileServer()
-	_, _ = fmt.Fprintf(os.Stderr, "Listen On"+server.Addr)
+	_, _ = fmt.Fprintf(os.Stderr, "Listen on %v", server.Addr)
 	log.Fatal(server.ListenAndServe())
 }

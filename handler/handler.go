@@ -47,7 +47,7 @@ func RenameHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	err := os.Rename(DownloadFolder + oldName, DownloadFolder + newName)
 	if err != nil{
-		log.Fatal(err)
+		writer.WriteHeader(500)
 		return
 	}
 	_, err = writer.Write([]byte(newName))
@@ -68,11 +68,14 @@ func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
 
 	err := os.Remove(DownloadFolder + filename)
 	if err != nil{
-		log.Fatal(err)
+		http.Error(writer, err.Error(), 500)
 	}
 
 	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
 		_, err = writer.Write([]byte("File Deleted: " + filename))
+		if err != nil{
+			http.Error(writer, err.Error(), 500)
+		}
 	}
 }
 
@@ -87,14 +90,14 @@ func DownloadHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	file, err := os.Open(DownloadFolder + filename)
 	if err != nil{
-		log.Fatal(err)
+		http.Error(writer, err.Error(), 500)
 	}
 
 	writer.Header().Set("Content-Disposition", "attachment; filename=" + filename)
 	writer.Header().Set("Content-Type", request.Header.Get("Content-Type"))
 	_, err = io.Copy(writer, file)
 	if err !=  nil {
-		log.Fatal(err)
+		http.Error(writer, err.Error(), 500)
 	}
 }
 
@@ -108,17 +111,13 @@ func UploadHandler(writer http.ResponseWriter, request *http.Request) {
 	fileName := namegen.GenerateFileName(10)
 	err := UploadFile(path.Join(DownloadFolder, fileName), uri)
 	if err != nil {
-		_, err = writer.Write([]byte(err.Error()))
-		if err != nil{
-			log.Fatal(err)
-		}
-		//writer.WriteHeader(500)
+		http.Error(writer, err.Error(), 404)
 		return
 	}
 
 	_, err = writer.Write([]byte(fileName))
 	if err != nil{
-		log.Fatal(err)
+		http.Error(writer, err.Error(), 500)
 	}
 }
 

@@ -2,7 +2,6 @@ package handler_test
 
 import (
 	"GoExcercise/handler"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -94,7 +93,7 @@ func TestRenameHandler(t *testing.T) {
 
 	err = os.Remove(handler.DownloadFolder + newName)
 	if err != nil {
-		log.Fatal(err)
+		t.Error(err)
 	}
 }
 
@@ -111,12 +110,12 @@ func TestUploadFile(t *testing.T) {
 	if err != nil {
 		t.Error("For", `google pic`, "expected", expected, "got", err.Error())
 	}
-	//err = os.Remove("testfile1")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//err = os.Remove("testfile2")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	err = os.Remove(handler.DownloadFolder+"testfile1")
+	if err != nil {
+		t.Error(err)
+	}
+	err = os.Remove(handler.DownloadFolder+"testfile2")
+	if err != nil {
+		t.Error(err)
+	}
 }
