@@ -26,7 +26,7 @@ func TestServer(t *testing.T) {
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil{
+	if err != nil {
 		t.Fatalf("Unable to read body")
 	}
 	filename := string(bodyBytes)
@@ -34,9 +34,9 @@ func TestServer(t *testing.T) {
 	newName := "name"
 
 	renUrl := url.URL{
-		Scheme:   "http",
-		Host:     "localhost:8080",
-		Path:     "/rename/"+filename+"/new/"+newName,
+		Scheme: "http",
+		Host:   "localhost:8080",
+		Path:   "/rename/" + filename + "/new/" + newName,
 	}
 	renResp, err := http.Get(renUrl.String())
 	if err != nil {
@@ -50,9 +50,9 @@ func TestServer(t *testing.T) {
 
 	t.Log(filename)
 	delUrl := url.URL{
-		Scheme:   "http",
-		Host:     "localhost:8080",
-		Path:     "/delete/"+newName,
+		Scheme: "http",
+		Host:   "localhost:8080",
+		Path:   "/delete/" + newName,
 	}
 
 	deleteResp, err := http.Get(delUrl.String())
@@ -65,4 +65,3 @@ func TestServer(t *testing.T) {
 		t.Fatalf("handler returned wrong status code: %v want %v", status, http.StatusOK)
 	}
 }
-

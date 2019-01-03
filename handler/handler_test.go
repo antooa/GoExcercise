@@ -99,7 +99,7 @@ func TestRenameHandler(t *testing.T) {
 
 func TestUploadFile(t *testing.T) {
 
-	err := handler.UploadFile( handler.DownloadFolder+"testfile1", "")
+	err := handler.UploadFile(handler.DownloadFolder+"testfile1", "")
 	expected := `Get : unsupported protocol scheme ""`
 	if err.Error() != expected {
 		t.Fatal("For", `""`, "expected", expected, "got", err.Error())
@@ -110,11 +110,11 @@ func TestUploadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal("For", `google pic`, "expected", expected, "got", err.Error())
 	}
-	err = os.Remove(handler.DownloadFolder+"testfile1")
+	err = os.Remove(handler.DownloadFolder + "testfile1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = os.Remove(handler.DownloadFolder+"testfile2")
+	err = os.Remove(handler.DownloadFolder + "testfile2")
 	if err != nil {
 		t.Fatal(err)
 	}
