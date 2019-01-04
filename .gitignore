@@ -1,6 +1,7 @@
 # User-specific files
 .idea/
 .DS_Store
-.downloads/
-./bin
+downloads/
+bin/
 myapps.tar
+vendor/
