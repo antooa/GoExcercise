@@ -2,9 +2,15 @@
 package handler
 
 import (
+	cli "GoExcercise/client"
 	"GoExcercise/namegen"
+	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/olivere/elastic"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -21,14 +27,106 @@ func init() {
 }
 
 // NewHandler creates a new gorilla mux router and provides pattern-handler mapping
-func NewHandler() http.Handler {
+func NewHandler(elasticClient *elastic.Client ) http.Handler {
 	router := mux.NewRouter()
 	router.HandleFunc("/upload", UploadHandler)
 	router.HandleFunc("/download/", DownloadHandler)
 	router.HandleFunc("/delete/{filename}", DeleteHandler)
 	router.HandleFunc("/rename/{oldName}/new/{newName}", RenameHandler)
+	router.HandleFunc("/description/{filename}", NewDescriptionHandler(elasticClient)).Methods("POST")
+	router.HandleFunc("/description/{filename}", GetDescriptionHandler(elasticClient)).Methods("GET")
 	return router
 }
+
+func GetDescriptionHandler(client *elastic.Client) func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		vars := mux.Vars(request)
+		filename := vars["filename"]
+		// Search with a term query
+		termQuery := elastic.NewTermQuery("name", filename)
+		searchResult, err := client.Search().
+			Index(cli.IndexName).            // search in index "files"
+			Query(termQuery).           // specify the query
+			Sort("name.keyword", true). // sort by "name" field, ascending
+			From(0).Size(10).           // take documents 0-9
+			Pretty(true).               // pretty print request and response JSON
+			Do(context.Background())    // execute
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusNotFound)
+		}
+
+		//var file cli.File
+		//for _, item := range searchResult.Each(reflect.TypeOf(file)) {
+		//	if t, ok := item.(cli.File); ok {
+		//		_, err = writer.Write([]byte(t.Name + " " + t.Description) )
+		//		if err != nil{
+		//			http.Error(writer, err.Error(), http.StatusInternalServerError)
+		//		}
+		//	}
+		//}
+		if searchResult.Hits.TotalHits > 0 {
+			fmt.Printf("Found a total of %d tweets\n", searchResult.Hits.TotalHits)
+
+			// Iterate through results
+			for _, hit := range searchResult.Hits.Hits {
+				// hit.Index contains the name of the index
+
+				// Deserialize hit.Source into a cli.File (could also be just a map[string]interface{}).
+				var t cli.File
+				err := json.Unmarshal(*hit.Source, &t)
+				if err != nil {
+					// Deserialization failed
+					http.Error(writer, err.Error(), http.StatusInternalServerError)
+				}
+
+				// Work with cli.File
+				_, err =writer.Write([]byte(t.Name + " " + t.Description))
+				if err != nil{
+					http.Error(writer, err.Error(), http.StatusInternalServerError)
+				}
+			}
+		} else {
+			// No hits
+			_, err =writer.Write([]byte("Found no description\n"))
+			if err != nil{
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}
+
+	}
+}
+
+func NewDescriptionHandler(client *elastic.Client) http.HandlerFunc{
+	return func (writer http.ResponseWriter, request *http.Request) {
+		vars := mux.Vars(request)
+		filename := vars["filename"]
+		body, err := ioutil.ReadAll(request.Body)
+		if err != nil{
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+		}
+
+		file := cli.File{
+			Name:        filename,
+			Description: string(body),
+		}
+		_, err = client.Index().
+			Index(cli.IndexName).
+			Type("doc").
+			BodyJson(file).
+			Refresh("wait_for").
+			Do(context.Background())
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+		}
+
+		_, err = writer.Write([]byte(filename + " " + string(body)))
+		if err != nil{
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+
 
 func RenameHandler(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)

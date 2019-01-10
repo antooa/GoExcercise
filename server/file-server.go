@@ -3,13 +3,14 @@ package server
 
 import (
 	"GoExcercise/handler"
+	"github.com/olivere/elastic"
 	"net/http"
 	"time"
 )
 
 // NewFileServer returns a new Server. Also creates new Handler for the Server
-func NewFileServer() *http.Server {
-	myHandler := handler.NewHandler()
+func NewFileServer(elasticClient *elastic.Client) *http.Server {
+	myHandler := handler.NewHandler(elasticClient)
 	return &http.Server{
 		Addr:              ":8080",
 		Handler:           myHandler,
