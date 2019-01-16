@@ -4,9 +4,6 @@ package handler
 import (
 	cli "GoExcercise/client"
 	"GoExcercise/namegen"
-	"context"
-	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/olivere/elastic"
 	"io"
@@ -27,151 +24,162 @@ func init() {
 }
 
 // NewHandler creates a new gorilla mux router and provides pattern-handler mapping
-func NewHandler(elasticClient *elastic.Client ) http.Handler {
+func NewHandler(elasticClient *elastic.Client) http.Handler {
 	router := mux.NewRouter()
-	router.HandleFunc("/upload", UploadHandler)
-	router.HandleFunc("/download/", DownloadHandler)
-	router.HandleFunc("/delete/{filename}", DeleteHandler)
-	router.HandleFunc("/rename/{oldName}/new/{newName}", RenameHandler)
-	router.HandleFunc("/description/{filename}", NewDescriptionHandler(elasticClient)).Methods("POST")
-	router.HandleFunc("/description/{filename}", GetDescriptionHandler(elasticClient)).Methods("GET")
+	router.HandleFunc("/upload", UploadHandler(elasticClient)).Methods("POST")
+	router.HandleFunc("/download/{id}", DownloadHandler(elasticClient)).Methods("GET")
+	router.HandleFunc("/delete/{id}", DeleteHandler(elasticClient)).Methods("DELETE")
+	router.HandleFunc("/rename/{id}/new/{newName}", RenameHandler(elasticClient)).Methods("PUT")
+	router.HandleFunc("/description/{id}", NewDescriptionHandler(elasticClient)).Methods("PUT")
+	router.HandleFunc("/description/{id}", GetDescriptionHandler(elasticClient)).Methods("GET")
 	return router
 }
 
+// GetDescriptionHandler provides a handler which returns a file description in response.
 func GetDescriptionHandler(client *elastic.Client) func(http.ResponseWriter, *http.Request) {
+
 	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
-		filename := vars["filename"]
-		// Search with a term query
-		termQuery := elastic.NewTermQuery("name", filename)
-		searchResult, err := client.Search().
-			Index(cli.IndexName).            // search in index "files"
-			Query(termQuery).           // specify the query
-			Sort("name.keyword", true). // sort by "name" field, ascending
-			From(0).Size(10).           // take documents 0-9
-			Pretty(true).               // pretty print request and response JSON
-			Do(context.Background())    // execute
+		id := vars["id"]
+
+		file, err := cli.ReadDoc(client, id)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusNotFound)
 		}
 
-		//var file cli.File
-		//for _, item := range searchResult.Each(reflect.TypeOf(file)) {
-		//	if t, ok := item.(cli.File); ok {
-		//		_, err = writer.Write([]byte(t.Name + " " + t.Description) )
-		//		if err != nil{
-		//			http.Error(writer, err.Error(), http.StatusInternalServerError)
-		//		}
-		//	}
-		//}
-		if searchResult.Hits.TotalHits > 0 {
-			fmt.Printf("Found a total of %d tweets\n", searchResult.Hits.TotalHits)
-
-			// Iterate through results
-			for _, hit := range searchResult.Hits.Hits {
-				// hit.Index contains the name of the index
-
-				// Deserialize hit.Source into a cli.File (could also be just a map[string]interface{}).
-				var t cli.File
-				err := json.Unmarshal(*hit.Source, &t)
-				if err != nil {
-					// Deserialization failed
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
-				}
-
-				// Work with cli.File
-				_, err =writer.Write([]byte(t.Name + " " + t.Description))
-				if err != nil{
-					http.Error(writer, err.Error(), http.StatusInternalServerError)
-				}
-			}
-		} else {
-			// No hits
-			_, err =writer.Write([]byte("Found no description\n"))
-			if err != nil{
-				http.Error(writer, err.Error(), http.StatusInternalServerError)
-			}
+		_, err = writer.Write([]byte(file.Description))
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
-
 	}
 }
 
-func NewDescriptionHandler(client *elastic.Client) http.HandlerFunc{
-	return func (writer http.ResponseWriter, request *http.Request) {
+// NewDescriptionHandler provides a handler which changes the Description field of the doc stored in ES.
+//
+// Returns a new description in response.
+func NewDescriptionHandler(client *elastic.Client) http.HandlerFunc {
+
+	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
-		filename := vars["filename"]
+		id := vars["id"]
 		body, err := ioutil.ReadAll(request.Body)
-		if err != nil{
+		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 		}
 
+		oldFile, err := cli.ReadDoc(client, id)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusNotFound)
+		}
+
 		file := cli.File{
-			Name:        filename,
+			Name:        oldFile.Name,
+			Url:         oldFile.Url,
 			Description: string(body),
 		}
-		_, err = client.Index().
-			Index(cli.IndexName).
-			Type("doc").
-			BodyJson(file).
-			Refresh("wait_for").
-			Do(context.Background())
+
+		err = cli.UpdateDoc(client, id, file)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
 
-		_, err = writer.Write([]byte(filename + " " + string(body)))
-		if err != nil{
+		changedFile, err := cli.ReadDoc(client, id)
+		_, err = writer.Write([]byte(changedFile.Description))
+		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
 
+// RenameHandler provides a handler which changes the Name field of the doc, stored in ES.
+//
+// Returns a new name in response.
+func RenameHandler(client *elastic.Client) func(http.ResponseWriter, *http.Request) {
 
+	return func(writer http.ResponseWriter, request *http.Request) {
+		vars := mux.Vars(request)
+		newName := vars["newName"]
+		id := vars["id"]
 
-func RenameHandler(writer http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
-	oldName := vars["oldName"]
-	newName := vars["newName"]
-	if _, err := os.Stat(DownloadFolder + oldName); os.IsNotExist(err) {
-		writer.WriteHeader(http.StatusNotFound)
-		return
-	} else if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		return
+		//get the file
+		file, err := cli.ReadDoc(client, id)
+		oldName := file.Name
+
+		//check if the file exists
+		if _, err := os.Stat(DownloadFolder + oldName); os.IsNotExist(err) {
+			http.Error(writer, err.Error(), http.StatusNotFound)
+			return
+		} else if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := os.Stat(DownloadFolder + newName); !os.IsNotExist(err) {
+			http.Error(writer, err.Error(), http.StatusConflict)
+			return
+		}
+
+		//change file name to the new one
+		file.Name = newName
+
+		// update using the old file with a new file name
+		err = cli.UpdateDoc(client, id, file)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//rename in os
+		err = os.Rename(DownloadFolder+oldName, DownloadFolder+newName)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		//send new name in response
+		_, err = writer.Write([]byte(newName))
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
-	if _, err := os.Stat(DownloadFolder + newName); !os.IsNotExist(err) {
-		writer.WriteHeader(http.StatusConflict)
-		return
-	}
-	err := os.Rename(DownloadFolder+oldName, DownloadFolder+newName)
-	if err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	_, err = writer.Write([]byte(newName))
 }
 
 // DeleteHandler provides an ability to delete a file from server
 //
 // Simply delete the file from the local storage and if the file was successfully deleted
 // send the deleted filename in the response
-func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
-	filename := vars["filename"]
+func DeleteHandler(client *elastic.Client) func(http.ResponseWriter, *http.Request) {
 
-	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
-		writer.WriteHeader(http.StatusNotFound)
-		return
-	}
+	return func(writer http.ResponseWriter, request *http.Request) {
+		vars := mux.Vars(request)
+		id := vars["id"]
 
-	err := os.Remove(DownloadFolder + filename)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
-	}
+		file, err := cli.ReadDoc(client, id)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
-		_, err = writer.Write([]byte("File Deleted: " + filename))
+		if _, err := os.Stat(DownloadFolder + file.Name); os.IsNotExist(err) {
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		err = os.Remove(DownloadFolder + file.Name)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if _, err := os.Stat(DownloadFolder + file.Name); os.IsNotExist(err) {
+			_, err = writer.Write([]byte("Deleted file: " + file.Name))
+			if err != nil {
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		err = cli.DeleteDoc(client, id)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
@@ -181,46 +189,71 @@ func DeleteHandler(writer http.ResponseWriter, request *http.Request) {
 
 // DownloadHandler provides an ability to download the file from server using browser
 // Firstly DownloadHandler check if file is exist. If the check is successful, the file is copied to writer
-func DownloadHandler(writer http.ResponseWriter, request *http.Request) {
-	filename := path.Base(request.URL.Path)
+func DownloadHandler(client *elastic.Client) func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		vars := mux.Vars(request)
+		id := vars["id"]
 
-	if _, err := os.Stat(DownloadFolder + filename); os.IsNotExist(err) {
-		writer.WriteHeader(http.StatusNotFound)
-		return
-	}
-	file, err := os.Open(DownloadFolder + filename)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
-	}
+		doc, err := cli.ReadDoc(client, id)
+		if err != nil{
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+		}
 
-	writer.Header().Set("Content-Disposition", "attachment; filename="+filename)
-	writer.Header().Set("Content-Type", request.Header.Get("Content-Type"))
-	_, err = io.Copy(writer, file)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
+		if _, err := os.Stat(DownloadFolder + doc.Name); os.IsNotExist(err) {
+			http.Error(writer, err.Error(), http.StatusNotFound)
+			return
+		}
+		file, err := os.Open(DownloadFolder + doc.Name)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		writer.Header().Set("Content-Disposition", "attachment; filename="+doc.Name)
+		writer.Header().Set("Content-Type", request.Header.Get("Content-Type"))
+		_, err = io.Copy(writer, file)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
-
 // UploadHandler parses query from the request
 // and provides uploading file to the server local storage
 // with the randomly generated file name using namegen package
 // If downloading was successful, UploadHandler sends the file name in response
-func UploadHandler(writer http.ResponseWriter, request *http.Request) {
+func UploadHandler(client *elastic.Client) http.HandlerFunc {
 
-	uri := request.FormValue("uri")
-	fileName := namegen.GenerateFileName(10)
-	err := UploadFile(path.Join(DownloadFolder, fileName), uri)
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusNotFound)
-		return
-	}
+	return func(writer http.ResponseWriter, request *http.Request) {
+		uri := request.FormValue("uri")
+		fileName := namegen.GenerateFileName(10)
+		file := cli.File{
+			Name:        fileName,
+			Url:         uri,
+			Description: "",
+		}
 
-	_, err = writer.Write([]byte(fileName))
-	if err != nil {
-		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
+		id, err := cli.CreateDoc(client, file)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = UploadFile(path.Join(DownloadFolder, fileName), uri)
+		if err != nil {
+			delErr := cli.DeleteDoc(client, id)
+			if delErr != nil {
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+			http.Error(writer, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		_, err = writer.Write([]byte(id))
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
