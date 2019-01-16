@@ -2,15 +2,15 @@
 package server
 
 import (
+	"GoExcercise/client"
 	"GoExcercise/handler"
-	"github.com/olivere/elastic"
 	"net/http"
 	"time"
 )
 
 // NewFileServer returns a new Server. Also creates new Handler for the Server
-func NewFileServer(elasticClient *elastic.Client) *http.Server {
-	myHandler := handler.NewHandler(elasticClient)
+func NewFileServer(storage *client.ElasticStorage) *http.Server {
+	myHandler := handler.NewHandler(storage)
 	return &http.Server{
 		Addr:              ":8080",
 		Handler:           myHandler,
@@ -21,4 +21,3 @@ func NewFileServer(elasticClient *elastic.Client) *http.Server {
 		MaxHeaderBytes:    1 << 20,
 	}
 }
-

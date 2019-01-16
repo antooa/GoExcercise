@@ -16,33 +16,39 @@ type File struct {
 	Url         string `json:"url"`
 	Description string `json:"description"`
 }
+
+type ElasticStorage struct {
+	*elastic.Client
+}
+
 // NewElasticClient provides a new elastic.Client allocation and creation of the Index in ES.
 //
 // Returns a pointer to the created Client and an error
-func NewElasticClient() (*elastic.Client, error) {
+func NewElasticClient() (*ElasticStorage, error) {
 	client, err := elastic.NewClient(elastic.SetURL("http://elastic:9200"))
 	if err != nil {
-		return client, err
+		return nil, err
 	}
+	backend := &ElasticStorage{client}
 
 	//check if Index hasn't been created yet
-	exists, err := client.IndexExists(IndexName).Do(context.Background())
+	exists, err := backend.Client.IndexExists(IndexName).Do(context.Background())
 	if err != nil {
-		return client, err
+		return nil, err
 	}
 	if !exists {
-		_, err = client.CreateIndex(IndexName).Do(context.Background())
+		_, err = backend.Client.CreateIndex(IndexName).Do(context.Background())
 	}
 
-	return client, err
+	return backend, err
 }
 
-// CreateDoc provides a doc creation in the Index using elastic.Client
+// Create provides a doc creation in the Index using elastic.Client
 //
 // Returns an Id of the doc and an error
-func CreateDoc(client *elastic.Client, file File) (string , error) {
+func (storage *ElasticStorage) Create(file File) (string, error) {
 
-	res, err := client.Index().
+	res, err := storage.Client.Index().
 		Index(IndexName).
 		Type("doc").
 		BodyJson(file).
@@ -52,14 +58,14 @@ func CreateDoc(client *elastic.Client, file File) (string , error) {
 	return res.Id, err
 }
 
-// ReadDoc provides an ability to retrieve a doc from Index by Id
+// Read provides an ability to retrieve a doc from Index by Id
 //
 // Returns the doc and an error
-func ReadDoc(client *elastic.Client, id string) (File, error) {
+func (storage *ElasticStorage) Read(id string) (File, error) {
 
 	var file File
 
-	res, err := client.Get().
+	res, err := storage.Client.Get().
 		Index(IndexName).
 		Type("doc").
 		Id(id).
@@ -76,12 +82,12 @@ func ReadDoc(client *elastic.Client, id string) (File, error) {
 	return file, err
 }
 
-// DeleteDoc provides an ability to delete a doc by Id
+// Delete provides an ability to delete a doc by Id
 //
 // Returns an error
-func DeleteDoc(client *elastic.Client, id string)  error{
+func (storage *ElasticStorage) Delete(id string) error {
 
-	_, err := client.Delete().
+	_, err := storage.Client.Delete().
 		Index(IndexName).
 		Type("doc").
 		Id(id).
@@ -91,39 +97,20 @@ func DeleteDoc(client *elastic.Client, id string)  error{
 
 }
 
-// UpdateDoc provides an ability to update a doc using the fields of the newFile
+// Update provides an ability to update a doc using the fields of the newFile
 //
 // Returns an error
-func UpdateDoc(client *elastic.Client, id string, newFile File)  error{
+func (storage *ElasticStorage) Update(id string, newFile File) error {
 
-	_, err := client.Update().
+	_, err := storage.Client.Update().
 		Index(IndexName).
 		Type("doc").
 		Id(id).
-		Doc(map[string]interface{}{"name": newFile.Name}).
-		DetectNoop(false).
-		Do(context.Background())
-	if err != nil{
-		return err
-	}
-
-	_, err = client.Update().
-		Index(IndexName).
-		Type("doc").
-		Id(id).
-		Doc(map[string]interface{}{"url": newFile.Url}).
-		DetectNoop(false).
-		Do(context.Background())
-	if err != nil{
-		return err
-	}
-
-	_, err = client.Update().
-		Index(IndexName).
-		Type("doc").
-		Id(id).
-		Doc(map[string]interface{}{"description": newFile.Description}).
-		DetectNoop(false).
+		Doc(map[string]interface{}{
+			"name":        newFile.Name,
+			"url":         newFile.Url,
+			"description": newFile.Description,
+		}).DetectNoop(false).
 		Do(context.Background())
 
 	return err
