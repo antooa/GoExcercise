@@ -2,14 +2,13 @@
 package server
 
 import (
-	"GoExcercise/client"
 	"GoExcercise/handler"
 	"net/http"
 	"time"
 )
 
 // NewFileServer returns a new Server. Also creates new Handler for the Server
-func NewFileServer(storage *client.ElasticStorage) *http.Server {
+func NewFileServer(storage handler.Storage) *http.Server {
 	myHandler := handler.NewHandler(storage)
 	return &http.Server{
 		Addr:              ":8080",

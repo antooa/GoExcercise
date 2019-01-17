@@ -2,7 +2,6 @@
 package handler
 
 import (
-	cli "GoExcercise/client"
 	"GoExcercise/namegen"
 	"github.com/gorilla/mux"
 	"io"
@@ -22,8 +21,21 @@ func init() {
 	}
 }
 
+type File struct {
+	Name        string `json:"name"`
+	Url         string `json:"url"`
+	Description string `json:"description"`
+}
+
+type Storage interface {
+	Create(file File) (id string, err error)
+	Read(id string) (file File, err error)
+	Update(id string, newFile File) error
+	Delete(id string) error
+}
+
 // NewHandler creates a new gorilla mux router and provides pattern-handler mapping
-func NewHandler(storage *cli.ElasticStorage) http.Handler {
+func NewHandler(storage Storage) http.Handler {
 	router := mux.NewRouter()
 	router.HandleFunc("/upload", UploadHandler(storage)).Methods("POST")
 	router.HandleFunc("/download/{id}", DownloadHandler(storage)).Methods("GET")
@@ -35,7 +47,7 @@ func NewHandler(storage *cli.ElasticStorage) http.Handler {
 }
 
 // GetDescriptionHandler provides a handler which returns a file description in response.
-func GetDescriptionHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *http.Request) {
+func GetDescriptionHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
@@ -44,11 +56,13 @@ func GetDescriptionHandler(storage *cli.ElasticStorage) func(http.ResponseWriter
 		file, err := storage.Read(id)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusNotFound)
+			return
 		}
 
 		_, err = writer.Write([]byte(file.Description))
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 }
@@ -56,7 +70,7 @@ func GetDescriptionHandler(storage *cli.ElasticStorage) func(http.ResponseWriter
 // NewDescriptionHandler provides a handler which changes the Description field of the doc stored in ES.
 //
 // Returns a new description in response.
-func NewDescriptionHandler(storage *cli.ElasticStorage) http.HandlerFunc {
+func NewDescriptionHandler(storage Storage) http.HandlerFunc {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
@@ -74,7 +88,7 @@ func NewDescriptionHandler(storage *cli.ElasticStorage) http.HandlerFunc {
 			return
 		}
 
-		file := cli.File{
+		file := File{
 			Name:        oldFile.Name,
 			Url:         oldFile.Url,
 			Description: string(body),
@@ -86,6 +100,10 @@ func NewDescriptionHandler(storage *cli.ElasticStorage) http.HandlerFunc {
 		}
 
 		changedFile, err := storage.Read(id)
+		if err != nil{
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		_, err = writer.Write([]byte(changedFile.Description))
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -97,7 +115,7 @@ func NewDescriptionHandler(storage *cli.ElasticStorage) http.HandlerFunc {
 // RenameHandler provides a handler which changes the Name field of the doc, stored in ES.
 //
 // Returns a new name in response.
-func RenameHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *http.Request) {
+func RenameHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
@@ -151,7 +169,7 @@ func RenameHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *http.
 //
 // Simply delete the file from the local storage and if the file was successfully deleted
 // send the deleted filename in the response
-func DeleteHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *http.Request) {
+func DeleteHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
@@ -192,7 +210,7 @@ func DeleteHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *http.
 
 // DownloadHandler provides an ability to download the file from server using browser
 // Firstly DownloadHandler check if file is exist. If the check is successful, the file is copied to writer
-func DownloadHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *http.Request) {
+func DownloadHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		vars := mux.Vars(request)
 		id := vars["id"]
@@ -227,12 +245,12 @@ func DownloadHandler(storage *cli.ElasticStorage) func(http.ResponseWriter, *htt
 // and provides uploading file to the server local storage
 // with the randomly generated file name using namegen package
 // If downloading was successful, UploadHandler sends the file name in response
-func UploadHandler(storage *cli.ElasticStorage) http.HandlerFunc {
+func UploadHandler(storage Storage) http.HandlerFunc {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
 		uri := request.FormValue("uri")
 		fileName := namegen.GenerateFileName(10)
-		file := cli.File{
+		file := File{
 			Name:        fileName,
 			Url:         uri,
 			Description: "",
@@ -249,6 +267,7 @@ func UploadHandler(storage *cli.ElasticStorage) http.HandlerFunc {
 			delErr := storage.Delete(id)
 			if delErr != nil {
 				http.Error(writer, err.Error(), http.StatusInternalServerError)
+				return
 			}
 			http.Error(writer, err.Error(), http.StatusNotFound)
 			return

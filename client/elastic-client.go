@@ -2,6 +2,7 @@
 package client
 
 import (
+	"GoExcercise/handler"
 	"context"
 	"encoding/json"
 	"github.com/olivere/elastic"
@@ -11,15 +12,10 @@ const (
 	IndexName = "files"
 )
 
-type File struct {
-	Name        string `json:"name"`
-	Url         string `json:"url"`
-	Description string `json:"description"`
-}
-
 type ElasticStorage struct {
 	*elastic.Client
 }
+
 
 // NewElasticClient provides a new elastic.Client allocation and creation of the Index in ES.
 //
@@ -46,7 +42,7 @@ func NewElasticClient() (*ElasticStorage, error) {
 // Create provides a doc creation in the Index using elastic.Client
 //
 // Returns an Id of the doc and an error
-func (storage *ElasticStorage) Create(file File) (string, error) {
+func (storage *ElasticStorage) Create(file handler.File) (string, error) {
 
 	res, err := storage.Client.Index().
 		Index(IndexName).
@@ -61,9 +57,9 @@ func (storage *ElasticStorage) Create(file File) (string, error) {
 // Read provides an ability to retrieve a doc from Index by Id
 //
 // Returns the doc and an error
-func (storage *ElasticStorage) Read(id string) (File, error) {
+func (storage *ElasticStorage) Read(id string) (handler.File, error) {
 
-	var file File
+	var file handler.File
 
 	res, err := storage.Client.Get().
 		Index(IndexName).
@@ -100,7 +96,7 @@ func (storage *ElasticStorage) Delete(id string) error {
 // Update provides an ability to update a doc using the fields of the newFile
 //
 // Returns an error
-func (storage *ElasticStorage) Update(id string, newFile File) error {
+func (storage *ElasticStorage) Update(id string, newFile handler.File) error {
 
 	_, err := storage.Client.Update().
 		Index(IndexName).
