@@ -8,8 +8,8 @@ import (
 )
 
 // NewFileServer returns a new Server. Also creates new Handler for the Server
-func NewFileServer() *http.Server {
-	myHandler := handler.NewHandler()
+func NewFileServer(storage handler.Storage) *http.Server {
+	myHandler := handler.NewHandler(storage)
 	return &http.Server{
 		Addr:              ":8080",
 		Handler:           myHandler,
@@ -20,4 +20,3 @@ func NewFileServer() *http.Server {
 		MaxHeaderBytes:    1 << 20,
 	}
 }
-

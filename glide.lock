@@ -1,8 +1,21 @@
-hash: 6bde284fef6891bc155b098c2ac0c0e5a788e8950a4c361d6c5c6599d1a305b0
-updated: 2018-12-27T12:55:08.947834+02:00
+hash: c6830771ed5499ea1b5cf5813e69379b53c54d206de5d419a6dcb8216125c6ea
+updated: 2019-01-09T18:37:25.102568+02:00
 imports:
 - name: github.com/gorilla/context
   version: 51ce91d2eaddeca0ef29a71d766bb3634dadf729
 - name: github.com/gorilla/mux
   version: e3702bed27f0d39777b0b37b664b6280e8ef8fbf
+- name: github.com/mailru/easyjson
+  version: 60711f1a8329503b04e1c88535f419d0bb440bff
+  subpackages:
+  - buffer
+  - jlexer
+  - jwriter
+- name: github.com/olivere/elastic
+  version: f5738570b28a4b5fab39442e3a5b5ffc599a562c
+  subpackages:
+  - config
+  - uritemplates
+- name: github.com/pkg/errors
+  version: ffb6e22f01932bf7ac35e0bad9be11f01d1c8685
 testImports: []
