@@ -153,6 +153,9 @@ func RenameHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 		if _, err := os.Stat(DownloadFolder + newName); !os.IsNotExist(err) {
 			http.Error(writer, err.Error(), http.StatusConflict)
 			return
+		} else if err != nil{
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		//change file name to the new one
@@ -206,7 +209,10 @@ func DeleteHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 		}
 
 		if _, err := os.Stat(DownloadFolder + file.Name); os.IsNotExist(err) {
-			writer.WriteHeader(http.StatusNotFound)
+			http.Error(writer, err.Error(), http.StatusNotFound)
+			return
+		} else if err != nil{
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -257,7 +263,11 @@ func DownloadHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 		if _, err := os.Stat(DownloadFolder + doc.Name); os.IsNotExist(err) {
 			http.Error(writer, err.Error(), http.StatusNotFound)
 			return
+		} else if err != nil {
+			http.Error(writer, err.Error(), http.StatusInternalServerError)
+			return
 		}
+
 		file, err := os.Open(DownloadFolder + doc.Name)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
