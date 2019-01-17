@@ -8,10 +8,10 @@ import (
 )
 
 // NewFileServer returns a new Server. Also creates new Handler for the Server
-func NewFileServer(storage handler.Storage) *http.Server {
+func NewFileServer(storage handler.Storage, address string) *http.Server {
 	myHandler := handler.NewHandler(storage)
 	return &http.Server{
-		Addr:              ":8080",
+		Addr:              address,
 		Handler:           myHandler,
 		ReadTimeout:       10 * time.Second,
 		ReadHeaderTimeout: 0,

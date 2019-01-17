@@ -8,35 +8,31 @@ import (
 	"github.com/olivere/elastic"
 )
 
-const (
-	IndexName = "files"
-)
-
 type ElasticStorage struct {
 	*elastic.Client
+	IndexName string
 }
-
 
 // NewElasticClient provides a new elastic.Client allocation and creation of the Index in ES.
 //
 // Returns a pointer to the created Client and an error
-func NewElasticClient() (*ElasticStorage, error) {
-	client, err := elastic.NewClient(elastic.SetURL("http://elastic:9200"))
+func NewElasticClient(address string, IndexName string) (*ElasticStorage, error) {
+	client, err := elastic.NewClient(elastic.SetURL(address))
 	if err != nil {
 		return nil, err
 	}
-	backend := &ElasticStorage{client}
+	storage := &ElasticStorage{client, IndexName}
 
 	//check if Index hasn't been created yet
-	exists, err := backend.Client.IndexExists(IndexName).Do(context.Background())
+	exists, err := storage.Client.IndexExists(IndexName).Do(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		_, err = backend.Client.CreateIndex(IndexName).Do(context.Background())
+		_, err = storage.Client.CreateIndex(IndexName).Do(context.Background())
 	}
 
-	return backend, err
+	return storage, err
 }
 
 // Create provides a doc creation in the Index using elastic.Client
@@ -45,7 +41,7 @@ func NewElasticClient() (*ElasticStorage, error) {
 func (storage *ElasticStorage) Create(file handler.File) (string, error) {
 
 	res, err := storage.Client.Index().
-		Index(IndexName).
+		Index(storage.IndexName).
 		Type("doc").
 		BodyJson(file).
 		Refresh("wait_for").
@@ -62,7 +58,7 @@ func (storage *ElasticStorage) Read(id string) (handler.File, error) {
 	var file handler.File
 
 	res, err := storage.Client.Get().
-		Index(IndexName).
+		Index(storage.IndexName).
 		Type("doc").
 		Id(id).
 		Do(context.Background())
@@ -84,7 +80,7 @@ func (storage *ElasticStorage) Read(id string) (handler.File, error) {
 func (storage *ElasticStorage) Delete(id string) error {
 
 	_, err := storage.Client.Delete().
-		Index(IndexName).
+		Index(storage.IndexName).
 		Type("doc").
 		Id(id).
 		Do(context.Background())
@@ -99,7 +95,7 @@ func (storage *ElasticStorage) Delete(id string) error {
 func (storage *ElasticStorage) Update(id string, newFile handler.File) error {
 
 	_, err := storage.Client.Update().
-		Index(IndexName).
+		Index(storage.IndexName).
 		Type("doc").
 		Id(id).
 		Doc(map[string]interface{}{

@@ -6,20 +6,12 @@ import (
 	"github.com/gorilla/mux"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path"
 )
 
 const DownloadFolder = "/tmp/downloads/"
-
-func init() {
-	err := os.MkdirAll(DownloadFolder, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 type File struct {
 	Name        string `json:"name"`
@@ -50,6 +42,14 @@ func NewHandler(storage Storage) http.Handler {
 func GetDescriptionHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}()
+
 		vars := mux.Vars(request)
 		id := vars["id"]
 
@@ -73,6 +73,14 @@ func GetDescriptionHandler(storage Storage) func(http.ResponseWriter, *http.Requ
 func NewDescriptionHandler(storage Storage) http.HandlerFunc {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}()
+
 		vars := mux.Vars(request)
 		id := vars["id"]
 		body, err := ioutil.ReadAll(request.Body)
@@ -100,7 +108,7 @@ func NewDescriptionHandler(storage Storage) http.HandlerFunc {
 		}
 
 		changedFile, err := storage.Read(id)
-		if err != nil{
+		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -118,6 +126,14 @@ func NewDescriptionHandler(storage Storage) http.HandlerFunc {
 func RenameHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}()
+
 		vars := mux.Vars(request)
 		newName := vars["newName"]
 		id := vars["id"]
@@ -172,6 +188,14 @@ func RenameHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 func DeleteHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}()
+
 		vars := mux.Vars(request)
 		id := vars["id"]
 
@@ -211,7 +235,16 @@ func DeleteHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 // DownloadHandler provides an ability to download the file from server using browser
 // Firstly DownloadHandler check if file is exist. If the check is successful, the file is copied to writer
 func DownloadHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
+
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}()
+
 		vars := mux.Vars(request)
 		id := vars["id"]
 
@@ -248,6 +281,14 @@ func DownloadHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 func UploadHandler(storage Storage) http.HandlerFunc {
 
 	return func(writer http.ResponseWriter, request *http.Request) {
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = r.(error)
+				http.Error(writer, err.Error(), http.StatusInternalServerError)
+			}
+		}()
+
 		uri := request.FormValue("uri")
 		fileName := namegen.GenerateFileName(10)
 		file := File{
@@ -282,7 +323,13 @@ func UploadHandler(storage Storage) http.HandlerFunc {
 }
 
 // UploadFile copies the body of the response into the new file on the server
-func UploadFile(filepath string, url string) error {
+func UploadFile(filepath string, url string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = r.(error)
+
+		}
+	}()
 
 	out, err := os.Create(filepath)
 	if err != nil {
