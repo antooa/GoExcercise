@@ -3,6 +3,7 @@ package handler
 
 import (
 	"GoExcercise/namegen"
+	"errors"
 	"github.com/gorilla/mux"
 	"io"
 	"io/ioutil"
@@ -32,7 +33,7 @@ func NewHandler(storage Storage) http.Handler {
 	router.HandleFunc("/upload", RecoveryMiddleware(UploadHandler(storage))).Methods("POST")
 	router.HandleFunc("/download/{id}", RecoveryMiddleware(DownloadHandler(storage))).Methods("GET")
 	router.HandleFunc("/delete/{id}", RecoveryMiddleware(DeleteHandler(storage))).Methods("DELETE")
-	router.HandleFunc("/rename/{id}/new/{newName}", RecoveryMiddleware(RenameHandler(storage))).Methods("PUT")
+	router.HandleFunc("/rename/{id}/new/{newName}", RenameHandler(storage)).Methods("PUT")
 	router.HandleFunc("/description/{id}", RecoveryMiddleware(NewDescriptionHandler(storage))).Methods("PUT")
 	router.HandleFunc("/description/{id}", RecoveryMiddleware(GetDescriptionHandler(storage))).Methods("GET")
 	return router
@@ -135,13 +136,15 @@ func RenameHandler(storage Storage) func(http.ResponseWriter, *http.Request) {
 		oldName := file.Name
 
 		//check if the old file exists
-		if _, err := os.Stat(DownloadFolder + oldName); os.IsNotExist(err) {
+		if _, err := os.Stat(DownloadFolder + oldName); err != nil {
 			http.Error(writer, err.Error(), http.StatusNotFound)
 			return
 		}
 		//check if the new file doesn't exist
 		if _, err := os.Stat(DownloadFolder + newName); err == nil {
-			http.Error(writer, err.Error(), http.StatusConflict)
+			http.Error(writer,
+				errors.New("File with name " + newName + " already exists").Error(),
+				http.StatusConflict)
 			return
 		}
 
