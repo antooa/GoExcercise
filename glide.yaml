@@ -4,3 +4,5 @@ import:
   version: ~1.6.2
 - package: github.com/olivere/elastic
   version: ~6.2.15
+- package: github.com/lib/pq
+  version: ~1.0.0
