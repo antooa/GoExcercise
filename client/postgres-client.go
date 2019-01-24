@@ -3,6 +3,7 @@ package client
 import (
 	"GoExcercise/handler"
 	"database/sql"
+	"errors"
 	_ "github.com/lib/pq"
 )
 
@@ -12,6 +13,11 @@ type PostgresStorage struct {
 
 func NewPostgresClient(connStr string) (*PostgresStorage, error) {
 	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Ping()
 	if err != nil {
 		return nil, err
 	}
@@ -48,14 +54,24 @@ func (storage *PostgresStorage) Read(id string) (file handler.File, err error) {
 }
 
 func (storage *PostgresStorage) Update(id string, newFile handler.File) error {
-	_, err := storage.Exec("UPDATE files SET name = $1, url = $2, description = $3 WHERE id = $4",
+	res, err := storage.Exec("UPDATE files SET name = $1, url = $2, description = $3 WHERE id = $4",
 		newFile.Name, newFile.Url, newFile.Description, id)
+
+	rowsAffected, err := res.RowsAffected()
+	if rowsAffected == 0{
+		return errors.New("the requested record does not exist")
+	}
 
 	return err
 }
 
 func (storage *PostgresStorage) Delete(id string) error  {
-	_, err := storage.Exec("DELETE FROM files WHERE id = $1", id)
+	res, err := storage.Exec("DELETE FROM files WHERE id = $1", id)
+
+	rowsAffected, err := res.RowsAffected()
+	if rowsAffected == 0{
+		return errors.New("the requested record does not exist")
+	}
 
 	return err
 }

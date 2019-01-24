@@ -2,11 +2,11 @@ package main
 
 import (
 	"GoExcercise/client"
+	"GoExcercise/handler"
 	srv "GoExcercise/server"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 )
 
@@ -22,26 +22,27 @@ func main() {
 
 	flag.Parse()
 
-	var server *http.Server
+	var storageClient handler.Storage
+	var err error
 	if *elastic == "" && *sql == "" {
 		log.Fatal("Error: data storage address is not set")
 
 	} else if *sql == "" {
-		elasticClient, err := client.NewElasticClient(*elastic, *index)
+		storageClient, err = client.NewElasticClient(*elastic, *index)
 		if err != nil {
 			log.Fatal(err)
 		}
-		server = srv.NewFileServer(elasticClient, *addr)
 
 	} else {
-		sqlClient, err := client.NewPostgresClient(*sql)
+		storageClient, err = client.NewPostgresClient(*sql)
 		if err != nil{
 			log.Fatal(err)
 		}
-		server = srv.NewFileServer(sqlClient, *addr)
 	}
 
-	err := os.MkdirAll(*downloads, os.ModePerm)
+	server := srv.NewFileServer(storageClient, *addr)
+
+	err = os.MkdirAll(*downloads, os.ModePerm)
 	if err != nil {
 		log.Fatal(err)
 	}
