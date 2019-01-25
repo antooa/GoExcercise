@@ -1,10 +1,12 @@
-hash: c6830771ed5499ea1b5cf5813e69379b53c54d206de5d419a6dcb8216125c6ea
-updated: 2019-01-09T18:37:25.102568+02:00
+hash: 41f10e117df0f02de4e0a6f86b4f70cba30fa4b6a3d9df2e35e3b0978f13d528
+updated: 2019-01-22T16:18:21.586101+02:00
 imports:
 - name: github.com/gorilla/context
   version: 51ce91d2eaddeca0ef29a71d766bb3634dadf729
 - name: github.com/gorilla/mux
   version: e3702bed27f0d39777b0b37b664b6280e8ef8fbf
+- name: github.com/lib/pq
+  version: 4ded0e9383f75c197b3a2aaa6d590ac52df6fd79
 - name: github.com/mailru/easyjson
   version: 60711f1a8329503b04e1c88535f419d0bb440bff
   subpackages:
